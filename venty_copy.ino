@@ -120,21 +120,27 @@ void loop()
     oldPosition = newPosition;
 
 //interface pins read and states
-    swstate=digitalRead(swpin);
+    swstate=digitalRead(swpin); // just printed right now -Phil
+    mstate=digitalRead(mpin);  // unused right now -Phil
+ 
+    // simple "inc/dec once per push changes" -Phil
+    // rearranging so the inc and dec are together -Phil
+    // the if condition will be true when the button is newly pushed =Phil
+    if((kstate == HIGH) && (digitalRead(kpin) == LOW)){tidalvol --;}
     kstate=digitalRead(kpin);
-    lstate=digitalRead(lpin);
-    mstate=digitalRead(mpin);
-    nstate=digitalRead(npin);
+    // same thing, but a little more compact -Phil
+    if(sstate && !digitalRead(spin)){tidalvol ++;}
     sstate=digitalRead(spin);
+    
+    if(tstate && !digitalRead(tpin)){ieratio ++;}
     tstate=digitalRead(tpin);
+    if(lstate && !digitalRead(lpin)){ieratio --;}
+    lstate=digitalRead(lpin);
+    
+    if(vstate && !digitalRead(vpin)){bpm ++;}
     vstate=digitalRead(vpin);
-
-    if(vstate == LOW){bpm ++;}
-    if(nstate == LOW){bpm --;}
-    if(tstate == LOW){ieratio ++;}
-    if(lstate == LOW){ieratio --;}
-    if(sstate == LOW){tidalvol ++;}
-    if(kstate == LOW){tidalvol --;}
+    if(nstate && !digitalRead(npin)){bpm --;}
+    nstate=digitalRead(npin);
 
 //case output function call
 //  caseFunc();
