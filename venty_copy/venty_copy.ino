@@ -17,7 +17,7 @@
 #include <LiquidCrystal_I2C.h>
 #include <Encoder.h>
 
-// Git Test
+// Working on limits for tidal, I/E, BPM - Phil
 boolean toggle4 = LOW;
 unsigned long tick = 0;
 unsigned long mtime;
