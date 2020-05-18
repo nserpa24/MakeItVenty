@@ -17,6 +17,8 @@
 #include <LiquidCrystal_I2C.h>
 #include <Encoder.h>
 
+#include <Button.h>  // button class that will enable greater capabilities
+
 // Working on limits for tidal, I/E, BPM - Phil
 boolean toggle4 = LOW;
 unsigned long tick = 0;
@@ -197,6 +199,7 @@ void loop()
   analogWrite(MOTORPIN,PID_out);
   
   delay(5);
+  digitalWrite( LED_BUILTIN, !digitalRead(LED_BUILTIN));  //Toggle 1/loop for timing
 }
 //Sine wave stage funtion 
 void sinfunc01 (){
@@ -245,7 +248,7 @@ void VentyLcdNew(){
 void caseFunc(){
  if (++prestate >= 2) {
     prestate = 0;
- digitalWrite(LED_BUILTIN,toggle4);
+ // temporary comment digitalWrite(LED_BUILTIN,toggle4);
  toggle4 = !toggle4;
   state++;
   switch ((state/256) % 8) {
