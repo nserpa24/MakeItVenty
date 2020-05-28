@@ -18,10 +18,12 @@
 #include <Wire.h> 
 #include <LiquidCrystal_I2C.h>
 #include <Encoder.h>
-#include <Streaming.h> // this supporting the << streaming operator, which allows more compact Serial.print
+//#include <Streaming.h> // this supporting the << streaming operator, which allows more compact Serial.print
 #include "venty-table.h"
 //#include <Button.h>  // button class (Button-Arduino library) that will enable greater capabilities in the future
 
+boolean initstatus = 0;
+int initreqspeed = 90;
 boolean toggle4 = LOW;
 unsigned long tick = 0;
 unsigned long mtime;
@@ -145,6 +147,7 @@ analogReference(DEFAULT);
 
 void loop()
 {
+
     //encoder position set
     newPosition = myEnc.read();
     long encspeed = newPosition-oldPosition;
@@ -184,9 +187,7 @@ void loop()
   //analogWrite(analogOutPin, outputValue);
 
 //  Serial.print("sensor = ");
-//  Serial.print(sensorValue);
-//  Serial.print("\t output = ");
-//  Serial.print(outputValue);
+
 
 //  Serial.print("\t Speed = ");
 //  Serial.print(speed);
@@ -219,7 +220,7 @@ void loop()
 //  Serial.print("\t Time = ");
 //  Serial.print(mtime);
 
-Serial << "I/E ratio = 1:" << ieratio << " bpm = " << bpm << " tidal = " << tidalvol << endl; 
+//Serial << "I/E ratio = 1:" << ieratio << " bpm = " << bpm << " tidal = " << tidalvol << endl; 
 
 //  Serial.print("millisComp = ");
 //  Serial.print(millisComp);
@@ -241,12 +242,15 @@ Serial << "I/E ratio = 1:" << ieratio << " bpm = " << bpm << " tidal = " << tida
 //  Serial.print(PID_d);
 //  Serial.print("\t EncNewPos = ");
 //  Serial.print(newPosition);
-//  Serial.print("\t PID Out = ");
-//  Serial.print(PID_out);
+  Serial.print("\t PID Out = ");
+  Serial.print(PID_out);
+  Serial.print(sensorValue);
+  Serial.print("\t output = ");
+  Serial.print(outputValue);
 //  Serial.print("\t SWstate = ");
 //  Serial.print(swstate);
   
-//  Serial.println();
+  Serial.println();
 
   tick++;
 
@@ -261,17 +265,15 @@ Serial << "I/E ratio = 1:" << ieratio << " bpm = " << bpm << " tidal = " << tida
 
   }
 
-//case controlled output
-// analogWrite(MOTORPIN,speed); 
-
 //potentiometer controlled output
 //analogWrite(MOTORPIN,outputValue);
 
 //PID controlled output
-  analogWrite(MOTORPIN,PID_out);
+   analogWrite(MOTORPIN,PID_out);
   
   delay(5);
 }
+
 
 //Sine wave stage funtion 
 void sinfunc01 (){
@@ -340,6 +342,21 @@ void VentyLcdNew(){
     lcd.setCursor(13,1);
     lcd.print("1:");
     lcd.print(ieratio);
+}
+
+//Initialization LCD request screeen
+void VentyLcdRequest(){
+  lcd.setCursor(0,0);
+  lcd.print("MakeItVenty");
+  lcd.setCursor(0,1);
+  lcd.print("Press 'GO' to Initialize");
+}
+
+//Initialization LCD request screeen
+void VentyLcdInitializing(){
+  lcd.setCursor(0,0);
+  lcd.print("Initializing...");
+
 }
 
 
