@@ -18,7 +18,7 @@
 #include <Wire.h> 
 #include <LiquidCrystal_I2C.h>
 #include <Encoder.h>
-//#include <Streaming.h> // this supporting the << streaming operator, which allows more compact Serial.print
+#include <Streaming.h> // this supporting the << streaming operator, which allows more compact Serial.print
 #include "venty-table.h"
 //#include <Button.h>  // button class (Button-Arduino library) that will enable greater capabilities in the future
 
@@ -39,6 +39,8 @@ long state = 0;
 int bpm = 10;
 int tidalvol = 400;
 int ieratio =1;
+//breath time parameters
+float msecPerBreath, inhaleMsec, exhaleMsec;
 
 //Button variable definitions
 boolean start = LOW;
@@ -395,4 +397,28 @@ void buttonProcess(void) {
     if(nstate && !digitalRead(npin)){bpm -= BPM_STEP;} //6
     nstate=digitalRead(npin);
     MAKE_BETWEEN( BPM_MIN, bpm, BPM_MAX );
+    // update parameters that depend on inputs
+    updateParameters();
+}
+
+// update parameters that depend on inputs
+// we may want to only do this during certain states, sau at the end of a breath
+void updateParameters(void) {
+  // static variables retain the value between calls to the function
+  static int oldBPM = 0;
+  static int oldTidalVol = 0;
+  static int oldIERatio = 0;
+
+  if ( (oldBPM != bpm) || (oldIERatio != ieratio) || (oldTidalVol != tidalvol) ) {
+    //update static variables
+    oldBPM = bpm;
+    oldTidalVol = tidalvol;
+    oldIERatio = ieratio;
+    // update changed parameters
+    msecPerBreath = 60000./bpm;
+    inhaleMsec = msecPerBreath/(ieratio +1);
+    exhaleMsec = inhaleMsec * ieratio;
+    Serial << "updated params BPM:" << bpm << " ieratio: 1:"<< ieratio << " tidal volume:" << tidalvol << endl;
+    Serial << "msec/breath:" << msecPerBreath << " inhale:" << inhaleMsec << " exhale:" << exhaleMsec << endl;
+  }
 }
