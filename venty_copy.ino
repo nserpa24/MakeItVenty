@@ -172,8 +172,11 @@ void loop()
 //  caseFunc();
 
 //sin output function call
-  sinfunc01();
+//  sinfunc01();
 
+  // run Finite State Machine
+  FSM();
+  
 //PID loop function call
   PIDloop();
 
@@ -272,8 +275,6 @@ void loop()
 //potentiometer controlled output
 //analogWrite(MOTORPIN,outputValue);
 
-  // run Finite State Machine
-  FSM();
 //PID controlled output
    analogWrite(MOTORPIN,PID_out);
   
@@ -302,7 +303,7 @@ void PIDloop(){
   Time = millis();
   PIDError = ScaledSinVal - newPosition;
   PID_p = kp * PIDError;
-  PID_i = PID_i + (ki * PIDError);
+  PID_i = PID_i + (ki * PIDError); // this needs some kind of time related thing --Phil
   PID_d = kd * ((PIDError - previous_error)/ElapsedTime);
   PID_Value = PID_p + PID_i + PID_d;
   PID_out = map(PID_Value, 0, SinScale, 64, 128);
@@ -432,23 +433,54 @@ enum FSM_STATE fsmState = NO_STATE;
 long stateMsec = millis();
 
 void FSM( void ){
-  enum FSM_STATE oldFsmState = NO_STATE;
-  // check if we've just entered the current state
-  boolean newState = (fsmState != oldFsmState);
+  // keep track of the last state
+  static enum FSM_STATE lastFsmState = NO_STATE;
+  long t;
+  int  idx;
+  float frac;
   
-  oldFsmState = fsmState;
- switch ( fsmState ){
-  case NO_STATE:
+  // check if we've just entered the current state
+  boolean newState = (fsmState != lastFsmState);
+  lastFsmState = fsmState;
+
+  // check if the motor is moving out and we've hit the limit
+  if (!digitalRead(swpin) /*&& movin out*/ ) { // TO-DO: determine "moving out"
+   analogWrite(MOTORPIN,0); // this might be 128.  Whatever is needed to stop the motor
+    // set PID to limit position
+    SetFSMState( READY );
+  }
+  switch ( fsmState ){  case NO_STATE:
     Serial << "error: in FSM state 'NO_STATE'" << endl;
     SetFSMState( STARTUP );
     break;
   case STARTUP:
+    // in startup state, move motor out until it hits the limit
     break;
   case READY:
+    // in ready state, wait for some kind of signal that indicates
+    // the start of an inhale or exhale
+    // for now, assume immediate transition to INHALE
+    SetFSMState( INHALE );
     break;
   case INHALE:
+    // start driving the arm in.  Position is determined by the time in state
+    t = TimeInFSMState();
+    idx = int((t/inhaleMsec) * SIN_VAL_SIZE /2 +.5);  // inhale is the first half of the table
+    ScaledSinVal = sinVal[idx] * SinScale;
+    if (t >= inhaleMsec ) {
+      SetFSMState( EXHALE );
+    }
+    //ScaledSinVal feeds into PID   
     break;
   case EXHALE:
+    // start driving the arm out.  Position is determined by the time in state
+    t = TimeInFSMState();
+    idx = int((t/exhaleMsec) * SIN_VAL_SIZE /2 +.5);  // exhale is the second half of the table
+    ScaledSinVal = sinVal[idx+SIN_VAL_SIZE/2] * SinScale;
+    //ScaledSinVal feeds into PID   
+    if (t >= exhaleMsec ) {
+      SetFSMState( READY );
+    }
     break;
   default: 
     Serial << "error: in unknown FSM state (" << fsmState << ")" << endl;
@@ -463,5 +495,5 @@ void SetFSMState( enum FSM_STATE s ){
 }
 
 long TimeInFSMState( void ){
-  return millis() - fsmState;
+  return millis() - stateMsec;
 }
