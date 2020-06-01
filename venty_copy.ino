@@ -18,9 +18,10 @@
 #include <Wire.h> 
 #include <LiquidCrystal_I2C.h>
 #include <Encoder.h>
-//#include <Streaming.h> // this supporting the << streaming operator, which allows more compact Serial.print
+#include <Streaming.h> // this supporting the << streaming operator, which allows more compact Serial.print
 #include "venty-table.h"
 //#include <Button.h>  // button class (Button-Arduino library) that will enable greater capabilities in the future
+#include "FSM.h"
 
 boolean initstatus = 0;
 int initreqspeed = 90;
@@ -39,6 +40,8 @@ long state = 0;
 int bpm = 10;
 int tidalvol = 400;
 int ieratio =1;
+//breath time parameters
+float msecPerBreath, inhaleMsec, exhaleMsec;
 
 //Button variable definitions
 boolean start = LOW;
@@ -143,6 +146,7 @@ analogReference(DEFAULT);
   lcd.init();
   lcd.backlight();
 //lcd.noBacklight();
+  SetFSMState( STARTUP );
 }
 
 void loop()
@@ -168,8 +172,11 @@ void loop()
 //  caseFunc();
 
 //sin output function call
-  sinfunc01();
+//  sinfunc01();
 
+  // run Finite State Machine
+  FSM();
+  
 //PID loop function call
   PIDloop();
 
@@ -296,7 +303,7 @@ void PIDloop(){
   Time = millis();
   PIDError = ScaledSinVal - newPosition;
   PID_p = kp * PIDError;
-  PID_i = PID_i + (ki * PIDError);
+  PID_i = PID_i + (ki * PIDError); // this needs some kind of time related thing --Phil
   PID_d = kd * ((PIDError - previous_error)/ElapsedTime);
   PID_Value = PID_p + PID_i + PID_d;
   PID_out = map(PID_Value, 0, SinScale, 64, 128);
@@ -395,4 +402,98 @@ void buttonProcess(void) {
     if(nstate && !digitalRead(npin)){bpm -= BPM_STEP;} //6
     nstate=digitalRead(npin);
     MAKE_BETWEEN( BPM_MIN, bpm, BPM_MAX );
+    // update parameters that depend on inputs
+    updateParameters();
+}
+
+// update parameters that depend on inputs
+// we may want to only do this during certain states, sau at the end of a breath
+void updateParameters(void) {
+  // static variables retain the value between calls to the function
+  static int oldBPM = 0;
+  static int oldTidalVol = 0;
+  static int oldIERatio = 0;
+
+  if ( (oldBPM != bpm) || (oldIERatio != ieratio) || (oldTidalVol != tidalvol) ) {
+    //update static variables
+    oldBPM = bpm;
+    oldTidalVol = tidalvol;
+    oldIERatio = ieratio;
+    // update changed parameters
+    msecPerBreath = 60000./bpm;
+    inhaleMsec = msecPerBreath/(ieratio +1);
+    exhaleMsec = inhaleMsec * ieratio;
+    Serial << "updated params BPM:" << bpm << " ieratio: 1:"<< ieratio << " tidal volume:" << tidalvol << endl;
+    Serial << "msec/breath:" << msecPerBreath << " inhale:" << inhaleMsec << " exhale:" << exhaleMsec << endl;
+  }
+}
+
+//FSM related code  This may be broken into a separate file in the future
+enum FSM_STATE fsmState = NO_STATE;
+long stateMsec = millis();
+
+void FSM( void ){
+  // keep track of the last state
+  static enum FSM_STATE lastFsmState = NO_STATE;
+  long t;
+  int  idx;
+  float frac;
+  
+  // check if we've just entered the current state
+  boolean newState = (fsmState != lastFsmState);
+  lastFsmState = fsmState;
+
+  // check if the motor is moving out and we've hit the limit
+  if (!digitalRead(swpin) /*&& movin out*/ ) { // TO-DO: determine "moving out"
+   analogWrite(MOTORPIN,0); // this might be 128.  Whatever is needed to stop the motor
+    // set PID to limit position
+    SetFSMState( READY );
+  }
+  switch ( fsmState ){  case NO_STATE:
+    Serial << "error: in FSM state 'NO_STATE'" << endl;
+    SetFSMState( STARTUP );
+    break;
+  case STARTUP:
+    // in startup state, move motor out until it hits the limit
+    break;
+  case READY:
+    // in ready state, wait for some kind of signal that indicates
+    // the start of an inhale or exhale
+    // for now, assume immediate transition to INHALE
+    SetFSMState( INHALE );
+    break;
+  case INHALE:
+    // start driving the arm in.  Position is determined by the time in state
+    t = TimeInFSMState();
+    idx = int((t/inhaleMsec) * SIN_VAL_SIZE /2 +.5);  // inhale is the first half of the table
+    ScaledSinVal = sinVal[idx] * SinScale;
+    if (t >= inhaleMsec ) {
+      SetFSMState( EXHALE );
+    }
+    //ScaledSinVal feeds into PID   
+    break;
+  case EXHALE:
+    // start driving the arm out.  Position is determined by the time in state
+    t = TimeInFSMState();
+    idx = int((t/exhaleMsec) * SIN_VAL_SIZE /2 +.5);  // exhale is the second half of the table
+    ScaledSinVal = sinVal[idx+SIN_VAL_SIZE/2] * SinScale;
+    //ScaledSinVal feeds into PID   
+    if (t >= exhaleMsec ) {
+      SetFSMState( READY );
+    }
+    break;
+  default: 
+    Serial << "error: in unknown FSM state (" << fsmState << ")" << endl;
+    SetFSMState( STARTUP );
+    break;
+ }
+}
+
+void SetFSMState( enum FSM_STATE s ){
+  fsmState = s;
+  stateMsec = millis();  
+}
+
+long TimeInFSMState( void ){
+  return millis() - stateMsec;
 }
