@@ -21,6 +21,7 @@
 #include <Streaming.h> // this supporting the << streaming operator, which allows more compact Serial.print
 #include "venty-table.h"
 //#include <Button.h>  // button class (Button-Arduino library) that will enable greater capabilities in the future
+#include "FSM.h"
 
 boolean initstatus = 0;
 int initreqspeed = 90;
@@ -145,6 +146,7 @@ analogReference(DEFAULT);
   lcd.init();
   lcd.backlight();
 //lcd.noBacklight();
+  SetFSMState( STARTUP );
 }
 
 void loop()
@@ -270,6 +272,8 @@ void loop()
 //potentiometer controlled output
 //analogWrite(MOTORPIN,outputValue);
 
+  // run Finite State Machine
+  FSM();
 //PID controlled output
    analogWrite(MOTORPIN,PID_out);
   
@@ -421,4 +425,43 @@ void updateParameters(void) {
     Serial << "updated params BPM:" << bpm << " ieratio: 1:"<< ieratio << " tidal volume:" << tidalvol << endl;
     Serial << "msec/breath:" << msecPerBreath << " inhale:" << inhaleMsec << " exhale:" << exhaleMsec << endl;
   }
+}
+
+//FSM related code  This may be broken into a separate file in the future
+enum FSM_STATE fsmState = NO_STATE;
+long stateMsec = millis();
+
+void FSM( void ){
+  enum FSM_STATE oldFsmState = NO_STATE;
+  // check if we've just entered the current state
+  boolean newState = (fsmState != oldFsmState);
+  
+  oldFsmState = fsmState;
+ switch ( fsmState ){
+  case NO_STATE:
+    Serial << "error: in FSM state 'NO_STATE'" << endl;
+    SetFSMState( STARTUP );
+    break;
+  case STARTUP:
+    break;
+  case READY:
+    break;
+  case INHALE:
+    break;
+  case EXHALE:
+    break;
+  default: 
+    Serial << "error: in unknown FSM state (" << fsmState << ")" << endl;
+    SetFSMState( STARTUP );
+    break;
+ }
+}
+
+void SetFSMState( enum FSM_STATE s ){
+  fsmState = s;
+  stateMsec = millis();  
+}
+
+long TimeInFSMState( void ){
+  return millis() - fsmState;
 }
